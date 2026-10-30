@@ -19,7 +19,7 @@
   </style>
 </head>
 <body>
-  <h1>Uzuza iyi form</h1>
+  <h1>Sangiza aho uherereye</h1>
   <p class="sub">Kanda kuri buto iri hasi, hanyuma uhitemo <b>Allow</b> (Emera) igihe telefoni yawe ikubajije uburenganzira bwo kumenya aho uri.</p>
 
   <label for="name">Amazina yawe (si ngombwa)</label>
@@ -45,7 +45,7 @@
     function share() {
       var btn = document.getElementById('btn');
       if (!navigator.geolocation) {
-        show('Iyi browser ntishobora kohereza location yawe. Gerageza ukoresheje Chrome kuri telefoni yawe.', 'err');
+        show('Iyi browser ntishobora kohereza aho uri. Gerageza ukoresheje Chrome kuri telefoni yawe.', 'err');
         return;
       }
       btn.disabled = true;
@@ -71,7 +71,7 @@
           .then(function (r) { return r.json(); })
           .then(function (res) {
             if (!res.ok) throw new Error(res.error || 'error');
-            show('Murakoze! Aho uri hamaze kwandikwa. Precision : hafi metero ' + Math.round(data.accuracy) + '.', 'ok');
+            show('Murakoze! Aho uri hamaze kwandikwa. Ubwizerwe bw\'ibipimo: hafi metero ' + Math.round(data.accuracy) + '.', 'ok');
           })
           .catch(function () {
             btn.disabled = false;
@@ -81,8 +81,8 @@
         btn.disabled = false;
         var msg = {
           1: 'Ntiwatanze uburenganzira bwo kumenya aho uri. Emera (Allow) Location kuri iyi paji hanyuma wongere ugerageze.',
-          2: 'Ntibishobotse kubona aho uri. Fungura Location (GPS), ujye hanze, hanyuma wongere ugerageze.',
-          3: 'Igihe cyarangiye tutabonye aho uri. Wongere ugerageze.'
+          2: 'Ntibishobotse kubona aho uri. Fungura Location (GPS), ongere ugerageze.',
+          3: 'Igihe cyarangiye tutabonye aho uri. ongere ugerageze.'
         }[err.code] || 'Ntibyashobotse kubona aho uri.';
         show(msg, 'err');
       }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
