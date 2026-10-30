@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="rw">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sangiza aho uherereye</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 420px; margin: 0 auto; padding: 20px 16px; color: #222; background: #fff; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    p.sub { color: #555; margin-top: 0; }
+    label { display: block; margin: 14px 0 4px; font-weight: bold; font-size: 14px; }
+    input, textarea { width: 100%; box-sizing: border-box; padding: 10px; font-size: 16px; border: 1px solid #bbb; border-radius: 6px; font-family: inherit; }
+    button { width: 100%; margin-top: 20px; padding: 14px; font-size: 17px; border: 0; border-radius: 6px; background: #1a7f37; color: #fff; }
+    button:disabled { background: #999; }
+    #status { margin-top: 16px; padding: 12px; border-radius: 6px; display: none; }
+    .ok { background: #e6f4ea; color: #1a7f37; }
+    .err { background: #fdecea; color: #b3261e; }
+    .info { background: #eef3fb; color: #1f4e8c; }
+  </style>
+</head>
+<body>
+  <h1>Sangiza aho uherereye</h1>
+  <p class="sub">Kanda kuri buto iri hasi, hanyuma uhitemo <b>Allow</b> (Emera) igihe telefoni yawe ikubajije uburenganzira bwo kumenya aho uri. Ba uri hanze kandi Location (GPS) ifunguye.</p>
+
+  <label for="name">Amazina yawe (si ngombwa)</label>
+  <input id="name" type="text" maxlength="100">
+
+  <label for="note">Ibisobanuro by'inyongera (si ngombwa)</label>
+  <textarea id="note" rows="2" maxlength="200"></textarea>
+
+  <button id="btn" onclick="share()">Ohereza aho ndi</button>
+  <div id="status"></div>
+
+  <script>
+    // PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES:
+    var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyWMdQULHqYhFWQ8UcQ7NNHCrQ5UE9mkwVAv_gzMo4nIBY45ctb3ZCyRm953AL7NAU1/exec';
+
+    var SITE = new URLSearchParams(window.location.search).get('site') || '';
+
+    function show(msg, cls) {
+      var s = document.getElementById('status');
+      s.className = cls; s.style.display = 'block'; s.textContent = msg;
+    }
+
+    function share() {
+      var btn = document.getElementById('btn');
+      if (!navigator.geolocation) {
+        show('Iyi browser ntishobora kohereza aho uri. Gerageza ukoresheje Chrome kuri telefoni yawe.', 'err');
+        return;
+      }
+      btn.disabled = true;
+      show('Turimo gushaka aho uri… bishobora gufata amasegonda 30.', 'info');
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var data = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          site: SITE,
+          name: document.getElementById('name').value,
+          note: document.getElementById('note').value
+        };
+        show('Birimo kubikwa…', 'info');
+
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          // text/plain avoids a CORS preflight, which Apps Script doesn't support
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(data)
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (!res.ok) throw new Error(res.error || 'error');
+            show('Murakoze! Aho uri hamaze kwandikwa. Ubwizerwe bw\'ibipimo: hafi metero ' + Math.round(data.accuracy) + '.', 'ok');
+          })
+          .catch(function () {
+            btn.disabled = false;
+            show('Ntibyabitswe. Reba ko ufite interineti hanyuma wongere ugerageze.', 'err');
+          });
+      }, function (err) {
+        btn.disabled = false;
+        var msg = {
+          1: 'Ntiwatanze uburenganzira bwo kumenya aho uri. Emera (Allow) Location kuri iyi paji hanyuma wongere ugerageze.',
+          2: 'Ntibishobotse kubona aho uri. Fungura Location (GPS), ujye hanze, hanyuma wongere ugerageze.',
+          3: 'Igihe cyarangiye tutabonye aho uri. Jya hanze hanyuma wongere ugerageze.'
+        }[err.code] || 'Ntibyashobotse kubona aho uri.';
+        show(msg, 'err');
+      }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+    }
+  </script>
+</body>
+</html>
