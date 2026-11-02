@@ -20,7 +20,10 @@
 </head>
 <body>
   <h1>Sangiza aho uherereye</h1>
-  <p class="sub">Kanda kuri buto iri hasi, hanyuma uhitemo <b>Allow</b> (Emera) igihe telefoni yawe ikubajije uburenganzira bwo kumenya aho uri.</p>
+  <p class="sub">Kanda kuri buto iri hasi, hanyuma uhitemo <b>Allow</b> (Emera) igihe telefoni yawe ikubajije uburenganzira bwo kumenya aho uri. Ba uri hanze ahabona ikirere, kandi Location (GPS) ifunguye. Tegereza kugeza ubutumwa bwo gushimira bugaragaye.</p>
+
+  <label for="site">Izina ry'ahantu (ni ngombwa) *</label>
+  <input id="site" type="text" maxlength="100" required placeholder="Urugero: Nyagatare, Karangazi">
 
   <label for="name">Amazina yawe (si ngombwa)</label>
   <input id="name" type="text" maxlength="100">
@@ -35,7 +38,12 @@
     // PASTE YOUR APPS SCRIPT /exec URL BETWEEN THE QUOTES:
     var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnqLlfCl7eH4vNkmCUkjhQKx9bvxV7Hmtu0HB_msclgL1WvmJD8fnYAgCnEsGALCD3/exec';
 
-    var SITE = new URLSearchParams(window.location.search).get('site') || '';
+    var TARGET_ACCURACY = 15;   // metres: stop as soon as a reading is this good
+    var MAX_WAIT_MS = 60000;    // otherwise keep the best reading for up to 60 s
+
+    // If the link has ?site=..., pre-fill the site box (people can still edit it).
+    var urlSite = new URLSearchParams(window.location.search).get('site') || '';
+    document.getElementById('site').value = urlSite.replace(/_/g, ' ');
 
     function show(msg, cls) {
       var s = document.getElementById('status');
@@ -44,48 +52,86 @@
 
     function share() {
       var btn = document.getElementById('btn');
+      var siteBox = document.getElementById('site');
+      var site = siteBox.value.trim();
+      if (!site) {
+        show('Andika izina ry\'ahantu mbere yo kohereza.', 'err');
+        siteBox.style.borderColor = '#b3261e';
+        siteBox.focus();
+        return;
+      }
+      siteBox.style.borderColor = '';
       if (!navigator.geolocation) {
         show('Iyi browser ntishobora kohereza aho uri. Gerageza ukoresheje Chrome kuri telefoni yawe.', 'err');
         return;
       }
       btn.disabled = true;
-      show('Turimo gushaka aho uri… bishobora gufata amasegonda 30.', 'info');
+      show('Turimo gushaka aho uri… tegereza gato (kugeza ku munota 1).', 'info');
 
-      navigator.geolocation.getCurrentPosition(function (pos) {
-        var data = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          site: SITE,
-          name: document.getElementById('name').value,
-          note: document.getElementById('note').value
-        };
-        show('Birimo kubikwa…', 'info');
+      var best = null;
+      var done = false;
+      var start = Date.now();
 
-        fetch(SCRIPT_URL, {
-          method: 'POST',
-          // text/plain avoids a CORS preflight, which Apps Script doesn't support
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(data)
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (res) {
-            if (!res.ok) throw new Error(res.error || 'error');
-            show('Murakoze! Aho uri hamaze kwandikwa. Ubwizerwe bw\'ibipimo: hafi metero ' + Math.round(data.accuracy) + '.', 'ok');
-          })
-          .catch(function () {
-            btn.disabled = false;
-            show('Ntibyabitswe. Reba ko ufite interineti hanyuma wongere ugerageze.', 'err');
-          });
+      function finish() {
+        if (done) return;
+        done = true;
+        navigator.geolocation.clearWatch(watchId);
+        clearTimeout(timer);
+        if (!best) {
+          btn.disabled = false;
+          show('Ntibishobotse kubona aho uri. Fungura Location (GPS), ujye hanze, hanyuma wongere ugerageze.', 'err');
+          return;
+        }
+        send(best, site);
+      }
+
+      var watchId = navigator.geolocation.watchPosition(function (pos) {
+        if (!best || pos.coords.accuracy < best.coords.accuracy) best = pos;
+        var secs = Math.round((Date.now() - start) / 1000);
+        show('Turimo kunoza ibipimo… ubwizerwe ubu: hafi metero ' + Math.round(best.coords.accuracy) +
+             ' (amasegonda ' + secs + '). Tegereza.', 'info');
+        if (best.coords.accuracy <= TARGET_ACCURACY) finish();
       }, function (err) {
-        btn.disabled = false;
-        var msg = {
-          1: 'Ntiwatanze uburenganzira bwo kumenya aho uri. Emera (Allow) Location kuri iyi paji hanyuma wongere ugerageze.',
-          2: 'Ntibishobotse kubona aho uri. Fungura Location (GPS), ongere ugerageze.',
-          3: 'Igihe cyarangiye tutabonye aho uri. ongere ugerageze.'
-        }[err.code] || 'Ntibyashobotse kubona aho uri.';
-        show(msg, 'err');
-      }, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+        if (err.code === 1) {             // permission denied: stop immediately
+          done = true;
+          navigator.geolocation.clearWatch(watchId);
+          clearTimeout(timer);
+          btn.disabled = false;
+          show('Ntiwatanze uburenganzira bwo kumenya aho uri. Emera (Allow) Location kuri iyi paji hanyuma wongere ugerageze.', 'err');
+        }
+        // other errors: keep waiting; the timer will finish with the best reading so far
+      }, { enableHighAccuracy: true, maximumAge: 0, timeout: MAX_WAIT_MS });
+
+      var timer = setTimeout(finish, MAX_WAIT_MS);
+    }
+
+    function send(pos, site) {
+      var btn = document.getElementById('btn');
+      var data = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        site: site,
+        name: document.getElementById('name').value,
+        note: document.getElementById('note').value
+      };
+      show('Birimo kubikwa…', 'info');
+
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        // text/plain avoids a CORS preflight, which Apps Script doesn't support
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(data)
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.error || 'error');
+          show('Murakoze! Aho uri hamaze kwandikwa. Ubwizerwe bw\'ibipimo: hafi metero ' + Math.round(data.accuracy) + '.', 'ok');
+        })
+        .catch(function () {
+          btn.disabled = false;
+          show('Ntibyabitswe. Reba ko ufite interineti hanyuma wongere ugerageze.', 'err');
+        });
     }
   </script>
 </body>
