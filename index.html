@@ -23,11 +23,18 @@
     .err { background: #fdecea; color: #b3261e; }
     .info { background: #eef3fb; color: #1f4e8c; }
     small.req { color: #777; }
+    #done { text-align: center; padding-top: 60px; }
+    #done .tick { width: 80px; height: 80px; line-height: 80px; margin: 0 auto 16px; border-radius: 50%; background: #e6f4ea; color: #1a7f37; font-size: 44px; }
+    #done h1 { color: #1a7f37; }
+    #done p { font-size: 17px; color: #333; }
+    #done .acc { font-size: 14px; color: #777; }
+    #done .again { background: #fff; color: #1a7f37; border: 1px solid #1a7f37; margin-top: 32px; }
   </style>
 </head>
 <body>
+  <div id="formBox">
   <h1>Dusangize aho uherereye</h1>
-  <p class="sub">Uzuza iyi form iri hasi, nibagusaba gufungura location ukande kuri <b>Allow</b> (Emera). Tegereza kugeza ubutumwa bwo gushimira bugaragaye.</p>
+  <p class="sub">Uzuza iyi form iri hasi,hagarara hagati m'umurima(byibura metero 15 uvuye kumbibi) nibagusaba gufungura location ukande kuri <b>Allow</b> (Emera). Tegereza kugeza ubutumwa bwo gushimira bugaragaye.</p>
   <small class="req">* = ni ngombwa kuzuza</small>
 
   <label for="site">Izina ry'ahantu *</label>
@@ -74,15 +81,25 @@
   <textarea id="note" rows="2" maxlength="200"></textarea>
 
   <button id="btn" onclick="share()">Ohereza</button>
+  </div>
   <div id="status"></div>
 
+  <div id="done" style="display:none">
+    <div class="tick">✓</div>
+    <h1>Murakoze!</h1>
+    <p>Amakuru yawe yabitswe neza.</p>
+    <p class="acc" id="doneAcc"></p>
+    <button class="again" onclick="location.reload()">Ohereza andi makuru</button>
+  </div>
+
   <script>
-   
+  
     var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwnqLlfCl7eH4vNkmCUkjhQKx9bvxV7Hmtu0HB_msclgL1WvmJD8fnYAgCnEsGALCD3/exec';
 
     var TARGET_ACCURACY = 15;   // metres: stop as soon as a reading is this good
     var MAX_WAIT_MS = 60000;    // otherwise keep the best reading for up to 60 s
 
+    // If the link has ?site=..., pre-fill the site box (people can still edit it).
     var urlSite = new URLSearchParams(window.location.search).get('site') || '';
     document.getElementById('site').value = urlSite.replace(/_/g, ' ');
 
@@ -175,13 +192,14 @@
              ' (amasegonda ' + secs + '). Tegereza.', 'info');
         if (best.coords.accuracy <= TARGET_ACCURACY) finish();
       }, function (err) {
-        if (err.code === 1) {             // permission denied: stop immediately
+        if (err.code === 1) {           
           done = true;
           navigator.geolocation.clearWatch(watchId);
           clearTimeout(timer);
           btn.disabled = false;
           show('Ntiwatanze uburenganzira bwo kumenya aho uri. Emera (Allow) Location kuri iyi paji hanyuma wongere ugerageze.', 'err');
         }
+        // other errors: keep waiting; the timer will finish with the best reading so far
       }, { enableHighAccuracy: true, maximumAge: 0, timeout: MAX_WAIT_MS });
 
       var timer = setTimeout(finish, MAX_WAIT_MS);
@@ -206,13 +224,19 @@
 
       fetch(SCRIPT_URL, {
         method: 'POST',
+        // text/plain avoids a CORS preflight, which Apps Script doesn't support
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(data)
       })
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (!res.ok) throw new Error(res.error || 'error');
-          show('Murakoze! Amakuru yawe yabitswe. Ubwizerwe bw\'ibipimo: hafi metero ' + Math.round(data.accuracy) + '.', 'ok');
+          // Hide the form and show only the confirmation.
+          $('formBox').style.display = 'none';
+          $('status').style.display = 'none';
+          $('doneAcc').textContent = 'Ubwizerwe bw\'ibipimo: hafi metero ' + Math.round(data.accuracy) + '.';
+          $('done').style.display = 'block';
+          window.scrollTo(0, 0);
         })
         .catch(function () {
           btn.disabled = false;
